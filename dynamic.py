@@ -14,19 +14,31 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.layout = html.Div([
     html.Div(
         [
-            html.H5("Calorific Value"),
+            html.Div(
+        [
+            html.Div(
+        [
+            html.H5("Calorific Value", style={'text-align': 'right'}),
             dcc.Input(
                 id="calorific-value",
                 placeholder="Enter Calorific Value",
-                value='43700'
+                value=42700,
+                type="number",
+                debounce=True,
+                required=True
+                
             )
         ],
         className="Calorific Value",
         style={},
     ),
+        ],
+        id='calorific-filter-container',
+        style={'display': 'flex', 'justify-content': 'flex-end', 'margin-bottom': '2rem'},
+    ),
     html.Div(
         [
-        html.H2("Wind Scale Dropdown"),
+        html.H5("Wind Scale Dropdown", style={'text-align': 'right'}),
         dcc.Dropdown(
             id='wind-dropdown',
             options = [
@@ -43,12 +55,12 @@ app.layout = html.Div([
             multi=True,
         ),
         ],
-        className = "Wind Scale Dropdown",
-        style={"width": "50%", 'left': '10px'}
-        ),
-        html.Div(
+        id='wind-dropdown-container',
+        style={'display': 'flex', 'flex-direction': 'column', 'margin-bottom': '2rem'},
+    ),
+    html.Div(
         [
-        html.H2("Sea Scale Slider"),
+        html.H5("Sea Scale Slider", style={'text-align': 'right'}),
         dcc.Dropdown(
             id='sea-dropdown',
             options = [
@@ -67,56 +79,70 @@ app.layout = html.Div([
             multi=True,
         ),
         ],
-        className = "Sea Scale Dropdown",
-        style={"width": "60%","margin-left": "auto", "margin-right": "auto"} #"margin-left": "auto", "margin-right": "auto"
-        ),
+        id='sea-scale-dropdown-container',
+        style={'display': 'flex', 'flex-direction': 'column', 'margin-bottom': '2rem'},
+    ),
         html.Div(
         [
-        html.H2("Average Speed Slider"),
-        dcc.RangeSlider(
-            id='speed-slider',
-            min=min(df['Average Speed']),
-            max=max(df['Average Speed']),
-            step=1,
-            # dots=True,
-            marks = {
-                min(df['Average Speed']): str(min(df['Average Speed'])),
-                max(df['Average Speed']): str(max(df['Average Speed']))
-                # 0: '0',
-                # 1:'1'
-            },
-            # value=np.arange(0, 22, 0.1),
+        html.H5("Min Speed Value", style={'text-align': 'left'}),
+        dcc.Input(
+            id="min-speed-value",
+            type="number",
+            placeholder="0",
+            debounce=True,
+            required=True,
+            value=0
         ),
+        html.H5("Max Speed Value", style={'text-align': 'left'}),
+        dcc.Input(
+            id="max-speed-value",
+            type="number",
+            placeholder="22",
+            debounce=True,
+            required=True,
+            value=100
+        )
         ],
         className = "Average Scale Slider",
-        style={'width':'30%',"margin-left": "auto", "margin-right": "auto"}
+        style={"margin-left": "auto", "margin-right": "auto"}
         ),
+        ],
+        style={'order': '1', 'flex-basis': '28%'}
+    ),
         dcc.Graph(id="my-graph"),
-], className="container")
+], className="", style={'display': 'flex', 'justify-content': 'space-between', 'padding-right': '1.5rem'})
 
 @app.callback(
     dash.dependencies.Output('my-graph','figure'),
     [dash.dependencies.Input('wind-dropdown','value'),
     dash.dependencies.Input('sea-dropdown','value'),
-    dash.dependencies.Input('speed-slider','value'),
+    dash.dependencies.Input('min-speed-value','value'),
+    dash.dependencies.Input('max-speed-value','value'),
     dash.dependencies.Input('calorific-value','value')])
-def update_graph(wind_value, sea_value, speed_value,calorific_value):
-
+def update_graph(wind_value, sea_value, min_speed_value,max_speed_value,calorific_value):
+    # print(min_speed_value)
+    # print(max_speed_value)
     windScale = df[df['Wind Scale'].isin(wind_value)]
     seaScale = windScale[windScale['Sea'].isin(sea_value)]
-    # speedScale = seaScale[seaScale['Average Speed'].isin(np.arange(min(df['Average Speed']), max(df['Average Speed']), 0.1))]
+    speedScale = seaScale[seaScale['Speedvalue'].isin(np.around(np.arange(min_speed_value, max_speed_value, 0.1), decimals=1))]
     # dff = df[df['Wind Scale']>=wind_value[0]]
     # dff = df[df['Sea']>=sea_value[0]]
-    trace1 = go.Bar(x=seaScale['Date'], y=seaScale['Actual Consumption'], name="Actual Consumption")
-    trace2 = go.Bar(x=seaScale['Date'], y=seaScale['Reference Consumption'], name="Reference Consumption")
-    print("Calorific Value is {}".format(calorific_value))
+
+    # Add new "GREEN" column
+    speedScale['Caloriphic Consumption'] = speedScale['Reference Consumption'] * int(calorific_value) / 10000
+    speedScale['Caloriphic Consumption'] = (42700/ calorific_value) * speedScale['Reference Consumption']
+
+    trace1 = go.Bar(x=speedScale['Date'], y=speedScale['Actual Consumption'], name="Actual Consumption", text=df['Actual Consumption'] - df['Reference Consumption'])
+    trace2 = go.Bar(x=speedScale['Date'], y=speedScale['Reference Consumption'], name="Reference Consumption")
+    trace3 = go.Bar(x=speedScale['Date'], y=speedScale['Caloriphic Consumption'], name="Caloriphic Consumption")
+    # print("Calorific Value is {}".format(calorific_value))
     return {
-        'data': [trace1, trace2],
-        'layout': go.Layout(title='Actual Engine Consumption vs Charter Party Reference Consumption',
+        'data': [trace1, trace2, trace3],
+        'layout': go.Layout(title="<span style='font-size: 20px'>Actual Engine Consumption vs Charter Party Reference Consumption</span>",
         width=1250,
         height=650,
                         hovermode="closest",
-                        xaxis={'title': "Date", 'titlefont': {'color': 'black', 'size': 14},
+                        xaxis={'title': "Date", 'titlefont': {'color': 'black', 'size': 14},'zeroline':False,'ticks':"inside",'nticks':20,
                                    'tickfont': {'size': 9, 'color': 'black'}},
                         yaxis={'title': "Consumption", 'titlefont': {'color': 'black', 'size': 14, },
                                    'tickfont': {'color': 'black'}}
